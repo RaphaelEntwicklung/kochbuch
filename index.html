@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Raphaels Kochbuch</title>
+<meta name="theme-color" content="#2E4A3F">
+<meta name="description" content="Rezeptsammlung mit Portionenrechner, Timer und Einkaufsliste – funktioniert offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Klassisch und gut lesbar: warmes Papierweiss, fast schwarze Schrift, ein ruhiges Flaschengrün als einzige Farbe. */
+:root{
+  --bg:#FAF8F3; --surface:#FFFFFF; --ink:#1D1F1E; --muted:#5B605D; --line:#E2DED4;
+  --accent:#2E4A3F; --accent-ink:#FFFFFF; --accent-soft:#E7EDE9; --done:#9AA19D; --warn:#8A6A1F; --warn-soft:#F6EFD9;
+  --serif:"Noto Serif","Droid Serif",Georgia,"Times New Roman",serif;
+  --sans:system-ui,Roboto,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --fs:17px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121413; --surface:#1B1E1D; --ink:#ECEAE4; --muted:#A4AAA6; --line:#2E3330;
+  --accent:#A7C9B9; --accent-ink:#0F1513; --accent-soft:#23302A; --done:#6C726F; --warn:#E3C47A; --warn-soft:#2E2817; color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:var(--fs)}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.45}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--serif);font-weight:700;margin:0;text-wrap:balance}
+
+/* Kopfzeile */
+.top{position:sticky;top:0;z-index:20;background:var(--accent);color:var(--accent-ink);
+  padding:calc(env(safe-area-inset-top,0px) + 10px) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:10px;min-height:56px}
+.top h1{font-size:1.15rem;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{background:transparent;border:0;color:inherit;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;font-size:1.3rem;flex:none}
+.iconbtn:active{background:rgba(255,255,255,.15)}
+.iconbtn svg{width:24px;height:24px}
+
+main{padding:0 max(14px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto}
+
+/* Navigation unten */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 10px;color:var(--muted);text-decoration:none;font-size:.78rem;position:relative}
+.nav a svg{width:26px;height:26px}
+.nav a.on{color:var(--accent);font-weight:600}
+.badge[hidden]{display:none}
+.badge{position:absolute;top:4px;left:calc(50% + 8px);background:var(--accent);color:var(--accent-ink);border-radius:10px;font-size:.7rem;min-width:18px;height:18px;padding:0 5px;display:grid;place-items:center;font-weight:700}
+
+/* Liste */
+.search{position:sticky;top:56px;z-index:10;background:var(--bg);padding:12px 0 8px;margin-top:0}
+.search input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:1rem}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:7px 14px;font-size:.88rem;white-space:nowrap}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sec{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:18px 0 6px}
+.rows{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rows li+li{border-top:1px solid var(--line)}
+.rows a{display:flex;align-items:center;gap:10px;padding:13px 14px;color:inherit;text-decoration:none;min-height:56px}
+.rows a:active{background:var(--accent-soft)}
+.rows .t{flex:1;min-width:0}
+.rows .t b{display:block;font-family:var(--serif);font-weight:600;font-size:1.02rem}
+.rows .t span{display:block;font-size:.82rem;color:var(--muted)}
+.rows .chev{color:var(--muted);font-size:1.2rem}
+.hit{font-size:.8rem;color:var(--accent)}
+.empty{text-align:center;color:var(--muted);padding:40px 10px}
+.empty b{display:block;color:var(--ink);font-family:var(--serif);font-size:1.1rem;margin-bottom:6px}
+
+/* Rezept */
+.rh{padding:16px 0 4px}
+.rh .cat{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.rh h2{font-size:1.6rem;line-height:1.2;margin-top:4px}
+.rh .orig{font-size:.82rem;color:var(--muted);margin-top:4px}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0 6px}
+.stepper{display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stepper button{width:48px;height:48px;border:0;background:transparent;font-size:1.5rem;color:var(--accent)}
+.stepper button:active{background:var(--accent-soft)}
+.stepper .val{min-width:92px;text-align:center;padding:0 4px;line-height:1.1}
+.stepper .val b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.stepper .val span{font-size:.75rem;color:var(--muted)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;flex:1;min-width:220px}
+.seg button{border:0;background:transparent;border-radius:9px;padding:10px 6px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.wake{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;font-size:.9rem;text-align:left}
+.wake .dot{width:12px;height:12px;border-radius:6px;background:var(--done);flex:none}
+.wake.on .dot{background:#3C8D5A;box-shadow:0 0 0 4px rgba(60,141,90,.18)}
+.wake .lbl{flex:1}
+.wake .sw{font-weight:700;color:var(--accent)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 0;margin:12px 0}
+.subh{font-family:var(--serif);font-weight:700;padding:10px 14px 2px;font-size:1rem}
+.ing{list-style:none;margin:0;padding:0}
+.ing li button{display:grid;grid-template-columns:28px minmax(78px,auto) 1fr;gap:10px;align-items:start;width:100%;background:transparent;border:0;text-align:left;padding:9px 14px;min-height:46px}
+.ing li button:active{background:var(--accent-soft)}
+.box{width:24px;height:24px;border:2px solid var(--done);border-radius:6px;margin-top:1px;display:grid;place-items:center}
+.box svg{width:16px;height:16px;opacity:0}
+.q{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.n small{color:var(--muted)}
+.n .h{display:block;font-size:.8rem;color:var(--muted)}
+.ing li.done .box{background:var(--accent);border-color:var(--accent)}
+.ing li.done .box svg{opacity:1;color:var(--accent-ink)}
+.ing li.done .q,.ing li.done .n{color:var(--done);text-decoration:line-through}
+.step{display:flex;gap:12px;padding:10px 14px 14px;border-top:1px dashed var(--line);margin-top:4px}
+.step .no{flex:none;width:28px;height:28px;border-radius:14px;background:var(--accent-soft);color:var(--accent);font-weight:700;display:grid;place-items:center;font-size:.9rem}
+.step p{margin:0;flex:1;font-size:1.02rem;line-height:1.5}
+.tbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent);background:transparent;border-radius:18px;padding:5px 12px;font-size:.88rem;font-weight:600;margin:6px 6px 0 0}
+.tbtn svg{width:16px;height:16px}
+.temp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--accent-soft);border-radius:12px;padding:12px 14px;margin:12px 0;font-weight:600}
+.temp .tbtn{margin:0;background:var(--surface)}
+.info{border-radius:12px;padding:12px 14px;margin:12px 0;font-size:.92rem;background:var(--surface);border:1px solid var(--line)}
+.info.vb{background:var(--warn-soft);border-color:transparent}
+.info.vb b{color:var(--warn)}
+.notes label{display:block;font-weight:700;margin:18px 0 6px;font-family:var(--serif)}
+.notes textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px;font-size:1rem;resize:vertical}
+.notes .saved{font-size:.8rem;color:var(--muted);height:1.2em;margin-top:4px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px;font-weight:600;min-height:48px}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:active{opacity:.85}
+.src{font-size:.78rem;color:var(--muted);margin:16px 0}
+
+/* Timer */
+.tbar{position:sticky;top:56px;z-index:15;background:var(--warn-soft);color:var(--ink);display:flex;align-items:center;gap:10px;padding:8px max(14px,env(safe-area-inset-right,0px)) 8px max(14px,env(safe-area-inset-left,0px));text-decoration:none;font-weight:600;font-size:.92rem}
+.tbar .tm{font-variant-numeric:tabular-nums;font-size:1.05rem}
+.tlist{display:grid;gap:10px;margin-top:14px}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center}
+.tcard .lab{font-weight:600;min-width:0}
+.tcard .big{font-size:2.2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.tcard.over .big{color:#B3261E}
+.tcard .ctl{display:flex;gap:8px;grid-column:1/-1}
+.tcard .ctl .btn{flex:1;padding:8px}
+.own{display:flex;gap:10px;margin-top:18px}
+.own input{flex:1;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:1rem}
+.alarm{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:24px}
+.alarm div{background:var(--surface);border-radius:16px;padding:24px;max-width:360px;width:100%;text-align:center}
+.alarm h3{font-size:1.4rem;margin-bottom:6px}
+.alarm p{margin:0 0 18px;color:var(--muted)}
+.alarm .btn{width:100%}
+
+/* Einkauf */
+.shop h3{font-size:1.05rem;margin:18px 0 6px}
+.shop h3 span{font-family:var(--sans);font-weight:400;font-size:.82rem;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:10px;font-size:.92rem;max-width:calc(100% - 32px);text-align:center;border:0}
+.small{font-size:.85rem;color:var(--muted)}
+.about p{margin:10px 0}
+.fsrow{display:flex;gap:8px;margin:8px 0 16px}
+.fsrow .chip{font-size:1rem}
+.btn.sugg{display:block;text-align:center;text-decoration:none;color:inherit;margin-top:4px}
+.gate{position:fixed;inset:0;z-index:100;background:#2E4A3F;color:#fff;display:grid;place-items:center;padding:24px max(24px,env(safe-area-inset-right,0px)) 24px max(24px,env(safe-area-inset-left,0px))}
+.gate form{width:100%;max-width:340px;display:grid;gap:14px;text-align:center}
+.gate img{width:88px;height:88px;border-radius:20px;margin:0 auto}
+.gate h1{font-size:1.6rem;color:#fff}
+.gate p{margin:0;opacity:.9;font-size:.92rem}
+.gate input{padding:14px;border-radius:12px;border:0;font-size:1.1rem;background:#fff;color:#1D1F1E;text-align:center}
+.gate button{padding:14px;border-radius:12px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;font-size:1.05rem}
+.gate button:disabled{opacity:.6}
+.gate .err{min-height:1.4em;font-weight:600;color:#FFD9D2}
+#printArea{display:none}
+@media print{
+  @page{size:A5;margin:12mm}
+  html,body{background:#fff!important;color:#000!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important;font-family:Georgia,"Times New Roman",serif;font-size:10.5pt;color:#000}
+  #printArea h1{font-size:18pt;margin:0 0 2mm}
+  #printArea .meta{color:#555;font-size:9pt;border-bottom:1px solid #2E4A3F;padding-bottom:2mm;margin-bottom:3mm;font-family:Arial,sans-serif}
+  #printArea h2{font-size:9.5pt;text-transform:uppercase;letter-spacing:.06em;color:#2E4A3F;margin:4mm 0 1.5mm;font-family:Arial,sans-serif}
+  #printArea table{border-collapse:collapse;width:100%}
+  #printArea td{padding:.6mm 0;vertical-align:top}
+  #printArea td.q{text-align:right;white-space:nowrap;padding-right:3mm;font-weight:bold;width:22mm}
+  #printArea tr.sub td{font-weight:bold;padding-top:2mm}
+  #printArea ol{padding-left:5mm;margin:0}
+  #printArea li{margin:1.2mm 0}
+  #printArea .box{background:#eee;padding:2mm 3mm;margin:3mm 0;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printArea .small{font-size:8.5pt;color:#444}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<div id="tbar"></div>
+<main id="main"></main>
+<nav class="nav" id="nav">
+  <a href="#/" data-v="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>Rezepte</a>
+  <a href="#/einkauf" data-v="shop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h2l2 11h10l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>Einkauf<span class="badge" id="bShop" hidden></span></a>
+  <a href="#/timer" data-v="timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>Timer<span class="badge" id="bTimer" hidden></span></a>
+</nav>
+<div id="overlay"></div>
+<div id="printArea"></div>
+
+<script src="funktionen.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script>
+"use strict";
+function startApp(){
+/* ---------- Hilfen ---------- */
+const $=(s,el=document)=>el.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem('kb:'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+             set(k,v){try{localStorage.setItem('kb:'+k,JSON.stringify(v))}catch(e){}}};
+const clean=s=>String(s||'').replace(/\[\[([^|\]]+)\|[^\]]+\]\]/g,'$1');
+const plain=s=>{const d=document.createElement('div');d.innerHTML=clean(s);return d.textContent.replace(/\s+/g,' ').trim()};
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const slug=s=>norm(plain(s)).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const ICON={
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/></svg>',
+ back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 5l-7 7 7 7"/></svg>',
+ info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+};
+
+/* ---------- Daten vorbereiten ---------- */
+R.forEach(r=>{
+  r.slug=slug(r.title); r.name=plain(r.title);
+  r.ingText=norm(r.parts.map(p=>p.ing.map(g=>plain(g.n)).join(' | ')).join(' | '));
+  r.search=norm(r.name)+' '+r.ingText;
+});
+const BY=Object.fromEntries(R.map(r=>[r.slug,r]));
+const catName=k=>(CATS.find(c=>c[0]===k)||[k,k])[1];
+
+/* ---------- Zustand ---------- */
+let view='list', cur=null, filterCat=store.get('cat','alle'), query='';
+let mode=store.get('mode','alles');          // 'zutaten' | 'alles'
+let wakeWanted=store.get('wake',true);
+let fsScale=store.get('fs',1);
+document.documentElement.style.setProperty('--fs',(17*fsScale)+'px');
+
+const portions=r=>{const v=store.get('port:'+r.slug,null);return v>0?v:r.y.base};
+const factor=r=>portions(r)/r.y.orig;
+const qty=(g,f)=>g.q==null?'':fmt(g.q,g.u,f);
+const hint=(g,f)=>{if(g.q==null) return '';if(g.eggs) return eggHint(g.q,f,g.eggs);if(g.u==='Blatt') return gelHint(g.q,f);return ''};
+
+/* Zeitangaben für Timer erkennen */
+function findTimes(text){
+  const t=plain(text), out=[];
+  const re=/(\d+(?:[.,]\d+)?|¾|½|¼)(?:\s*[–-]\s*(\d+))?\s*(min\b|Minuten?|Std\.?|Stunden?)/g; let m;
+  while((m=re.exec(t))){
+    let v=({'¾':.75,'½':.5,'¼':.25})[m[1]]??parseFloat(m[1].replace(',','.'));
+    let mins=/^S/i.test(m[3])?v*60:v;
+    if(mins>0 && mins<=240) out.push({mins,label:m[0].replace(/\s+/g,' ')});
+  }
+  return out;
+}
+
+/* ---------- Router ---------- */
+function route(){
+  const h=location.hash.replace(/^#\/?/,'');
+  if(h.startsWith('r/')&&BY[h.slice(2)]){view='recipe';cur=BY[h.slice(2)]}
+  else if(h==='einkauf'){view='shop';cur=null}
+  else if(h==='timer'){view='timer';cur=null}
+  else if(h==='info'){view='about';cur=null}
+  else {view='list';cur=null}
+  render(); syncWake();
+}
+let navDepth=0, listY=0;
+window.addEventListener('hashchange',e=>{const was=view; if(was==='list') listY=window.scrollY; navDepth+= (location.hash.startsWith('#/r/')||location.hash==='#/info')?1:-Math.min(1,navDepth); route(); window.scrollTo(0, view==='list'?listY:0)});
+
+function header(title,back){
+  $('#top').innerHTML=(back?`<button class="iconbtn" id="back" aria-label="Zurück">${ICON.back}</button>`:'')+
+    `<h1>${esc(title)}</h1>`+(view==='list'?`<a class="iconbtn" href="#/info" aria-label="Einstellungen und Hilfe" style="color:inherit">${ICON.info}</a>`:'');
+  if(back) $('#back').onclick=()=>{ if(navDepth>0) history.back(); else location.hash='#/'; };
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===view||(view==='recipe'&&a.dataset.v==='list')||(view==='about'&&a.dataset.v==='list')));
+}
+
+function render(){
+  if(view==='list') renderList();
+  else if(view==='recipe') renderRecipe(cur);
+  else if(view==='shop') renderShop();
+  else if(view==='timer') renderTimers();
+  else renderAbout();
+  renderBadges(); renderTbar();
+}
+
+/* ---------- Rezeptliste ---------- */
+function renderList(){
+  header('Raphaels Kochbuch',false);
+  const m=$('#main');
+  m.innerHTML=`<div class="search"><input type="search" id="q" placeholder="Rezept oder Zutat suchen …" aria-label="Rezept oder Zutat suchen" value="${esc(query)}" autocomplete="off"></div>
+    <div class="chips" id="chips">${[['alle','Alle'],...CATS.map(c=>[c[0],c[1]])].map(([k,n])=>`<button class="chip${filterCat===k?' on':''}" data-k="${k}">${esc(n)}</button>`).join('')}</div>
+    <div id="res"></div>`;
+  $('#q').addEventListener('input',e=>{query=e.target.value;listResults()});
+  $('#chips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;filterCat=b.dataset.k;store.set('cat',filterCat);
+    document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b));listResults()});
+  listResults();
+}
+function listResults(){
+  const q=norm(query.trim()); const res=$('#res');
+  const hits=R.filter(r=>(filterCat==='alle'||r.cat===filterCat)&&(!q||r.search.includes(q)));
+  if(!hits.length){res.innerHTML=`<div class="empty"><b>Nichts gefunden</b>Kein Rezept enthält «${esc(query)}»${filterCat!=='alle'?' in dieser Kategorie':''}.</div>`;return}
+  let html='';
+  CATS.forEach(([k,n])=>{
+    const rs=hits.filter(r=>r.cat===k); if(!rs.length) return;
+    html+=`<div class="sec">${esc(n)}</div><ul class="rows">`+rs.map(r=>{
+      const viaIng=q&&!norm(r.name).includes(q);
+      const sub=viaIng?`<span class="hit">enthält «${esc(query.trim())}»</span>`:`<span>${esc(r.y.base+' '+r.y.unit)}${store.get('note:'+r.slug,'')?' · mit Notiz':''}</span>`;
+      return `<li><a href="#/r/${r.slug}"><div class="t"><b>${esc(r.name)}</b>${sub}</div><span class="chev">›</span></a></li>`}).join('')+`</ul>`;
+  });
+  res.innerHTML=html;
+}
+
+/* ---------- Rezeptansicht ---------- */
+function renderRecipe(r){
+  header(r.name,true);
+  const f=factor(r), checks=store.get('chk:'+r.slug,{}), n=portions(r);
+  const ingRow=(g,id)=>`<li class="${checks[id]?'done':''}"><button data-id="${id}"><span class="box">${ICON.check}</span><span class="q">${esc(qty(g,f))}</span><span class="n">${clean(g.n)}${hint(g,f)?`<span class="h">${esc(hint(g,f))}</span>`:''}</span></button></li>`;
+  let body='';
+  if(mode==='zutaten'){
+    body+='<div class="card">'; let open=false;
+    r.parts.forEach((p,pi)=>p.ing.forEach((g,gi)=>{
+      if(g.sub){ if(open) body+='</ul>'; body+=`<div class="subh">${clean(g.sub)}</div><ul class="ing">`; open=true }
+      else if(!open){ body+='<ul class="ing">'; open=true }
+      body+=ingRow(g,pi+'.'+gi);
+    }));
+    if(open) body+='</ul>'; body+='</div>';
+  } else {
+    let no=0;
+    r.parts.forEach((p,pi)=>{
+      body+='<div class="card">'; let open=false;
+      p.ing.forEach((g,gi)=>{
+        if(g.sub){ if(open) body+='</ul>'; body+=`<div class="subh">${clean(g.sub)}</div><ul class="ing">`; open=true }
+        else if(!open){ body+='<ul class="ing">'; open=true }
+        body+=ingRow(g,pi+'.'+gi);
+      });
+      if(open) body+='</ul>';
+      if(p.step){ no++; const times=findTimes(p.step);
+        body+=`<div class="step"${p.ing.length?'':' style="border-top:0"'}><span class="no">${no}</span><p>${clean(p.step)}${times.length?'<br>'+times.map(t=>timerBtn(r,t,plain(p.step))).join(''):''}</p></div>`;}
+      body+='</div>';
+    });
+  }
+  const tt=r.temp?findTimes(r.temp):[];
+  const temp=r.temp?`<div class="temp">${ICON.clock.replace('<svg','<svg width="20" height="20"')}<span style="flex:1;min-width:0">${clean(r.temp)}${r.vb?' <span class="small">· Vorschlag, nicht im Original</span>':''}</span>${tt.map(t=>timerBtn(r,t,'Backen')).join('')}</div>`:'';
+  const wakeOk='wakeLock' in navigator;
+  $('#main').innerHTML=`
+    <div class="rh"><div class="cat">${esc(catName(r.cat))}</div><h2>${esc(r.name)}</h2>
+      <div class="orig">Original: ${esc((r.y.label?r.y.label+' · ':'')+(r.y.est?'≈ ':'')+r.y.orig+' '+r.y.unit)}</div></div>
+    <div class="tools">
+      <div class="stepper" role="group" aria-label="Portionen">
+        <button id="minus" aria-label="Weniger">−</button>
+        <div class="val"><b id="pv">${esc(String(n).replace('.',','))}</b><span>${esc(r.y.unit)}</span></div>
+        <button id="plus" aria-label="Mehr">+</button>
+      </div>
+      <div class="seg" role="tablist" aria-label="Ansicht">
+        <button class="${mode==='zutaten'?'on':''}" data-m="zutaten" role="tab" aria-selected="${mode==='zutaten'}">Nur Zutaten</button>
+        <button class="${mode==='alles'?'on':''}" data-m="alles" role="tab" aria-selected="${mode==='alles'}">Mit Zubereitung</button>
+      </div>
+      <button class="wake" id="wake" ${wakeOk?'':'disabled'}><span class="dot"></span><span class="lbl" id="wakeLbl"></span><span class="sw" id="wakeSw"></span></button>
+    </div>
+    ${mode==='alles'?temp:''}
+    ${body}
+    ${mode==='zutaten'&&r.temp?temp:''}
+    ${mode==='alles'&&r.note?`<div class="info">${clean(r.note)}</div>`:''}
+    ${mode==='alles'&&r.vbn?`<div class="info vb"><b>Vorbehalt:</b> ${r.vbn.map(clean).join(' ')}</div>`:''}
+    <div class="actions">
+      <button class="btn pri" id="toShop">Auf Einkaufsliste</button>
+      <button class="btn" id="reset">Häkchen löschen</button>
+      <button class="btn" id="pdf">Als PDF teilen</button>
+      <button class="btn" id="print">Drucken</button>
+    </div>
+    ${META.vorschlagUrl&&r.bookId?`<a class="btn sugg" href="${esc(META.vorschlagUrl)}#${esc(r.bookId)}" target="_blank" rel="noopener">Verbesserung vorschlagen</a><p class="small">Öffnet das Rezeptbuch von Raphael – nur mit seiner Freigabe.</p>`:''}
+    <div class="notes"><label for="note">Meine Notizen</label>
+      <textarea id="note" placeholder="z. B. nächstes Mal weniger Zucker, Form 26 cm …">${esc(store.get('note:'+r.slug,''))}</textarea>
+      <div class="saved" id="saved"></div></div>
+    <div class="src">Quelle: ${esc(r.src)}</div>`;
+  // Portionen
+  const step=d=>{const cur=portions(r);const st=r.y.base>=100?50:(cur<=2?0.5:1);let v=Math.max(st>=50?50:0.5,Math.round((cur+d*st)*2)/2);store.set('port:'+r.slug,v);keepScroll(()=>renderRecipe(r))};
+  $('#minus').onclick=()=>step(-1); $('#plus').onclick=()=>step(1);
+  $('#pv').parentElement.onclick=()=>{store.set('port:'+r.slug,null);keepScroll(()=>renderRecipe(r));toast('Auf Grundmenge zurückgesetzt')};
+  document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;store.set('mode',mode);keepScroll(()=>renderRecipe(r))});
+  // Abhaken
+  $('#main').querySelectorAll('.ing button').forEach(b=>b.onclick=()=>{
+    const c=store.get('chk:'+r.slug,{}); const id=b.dataset.id; if(c[id]) delete c[id]; else c[id]=1; store.set('chk:'+r.slug,c);
+    b.parentElement.classList.toggle('done',!!c[id]);});
+  $('#reset').onclick=()=>{store.set('chk:'+r.slug,{});document.querySelectorAll('.ing li.done').forEach(li=>li.classList.remove('done'));toast('Häkchen gelöscht')};
+  $('#toShop').onclick=()=>addToShop(r);
+  $('#pdf').onclick=()=>sharePdf(r);
+  $('#print').onclick=()=>printRecipe(r);
+  // Notizen
+  let t; $('#note').addEventListener('input',e=>{clearTimeout(t);$('#saved').textContent='';t=setTimeout(()=>{store.set('note:'+r.slug,e.target.value.trim()?e.target.value:'');$('#saved').textContent='Gespeichert';},500)});
+  // Timer-Knöpfe
+  $('#main').querySelectorAll('[data-tmin]').forEach(b=>b.onclick=()=>startTimer(b.dataset.tlab,+b.dataset.tmin));
+  // Bildschirm
+  $('#wake').onclick=()=>{wakeWanted=!wakeWanted;store.set('wake',wakeWanted);syncWake()};
+  updWakeUI();
+}
+function timerBtn(r,t,ctx){
+  const lab=r.name+' · '+(ctx.length>34?ctx.slice(0,32)+'…':ctx);
+  return `<button class="tbtn" data-tmin="${t.mins}" data-tlab="${esc(lab)}">${ICON.clock} ${esc(t.label)}</button>`;
+}
+function keepScroll(fn){const y=window.scrollY;fn();window.scrollTo(0,y)}
+
+/* ---------- Bildschirm anlassen ---------- */
+let wl=null;
+async function syncWake(){
+  const want=(view==='recipe'&&wakeWanted)||(timers.some(t=>!t.ack)&&wakeWanted);
+  if(want&&!wl&&'wakeLock' in navigator&&document.visibilityState==='visible'){
+    try{wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>{wl=null;updWakeUI()})}catch(e){wl=null}
+  } else if(!want&&wl){try{await wl.release()}catch(e){} wl=null}
+  updWakeUI();
+}
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function updWakeUI(){
+  const b=$('#wake'); if(!b) return;
+  if(!('wakeLock' in navigator)){$('#wakeLbl').textContent=IOS?'Bildschirm-an braucht auf dem iPhone iOS 18.4 oder neuer':'Bildschirm-an wird hier nicht unterstützt (nur in der installierten App bzw. über https)';$('#wakeSw').textContent='';return}
+  b.classList.toggle('on',!!wl);
+  b.setAttribute('aria-pressed',String(wakeWanted));
+  $('#wakeLbl').textContent=wakeWanted?(wl?'Bildschirm bleibt an':'Bildschirm bleibt an (wird aktiviert …)'):'Bildschirm darf ausgehen';
+  $('#wakeSw').textContent=wakeWanted?'EIN':'AUS';
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){syncWake();tick()}});
+
+/* ---------- Einkaufsliste ---------- */
+let shop=store.get('shop',[]);
+function addToShop(r){
+  const f=factor(r); const n=portions(r);
+  shop=shop.filter(s=>s.r!==r.slug);
+  r.parts.forEach(p=>p.ing.forEach(g=>{const name=plain(g.n); if(!name) return;
+    shop.push({id:Math.random().toString(36).slice(2,9),r:r.slug,rn:r.name,p:n+' '+r.y.unit,q:qty(g,f),n:name,done:false})}));
+  store.set('shop',shop); renderBadges(); toast('Zutaten für '+n+' '+r.y.unit+' auf der Einkaufsliste');
+}
+function renderShop(){
+  header('Einkaufsliste',false);
+  const m=$('#main');
+  if(!shop.length){m.innerHTML=`<div class="empty"><b>Die Einkaufsliste ist leer</b>Öffne ein Rezept, stelle die Portionen ein und tippe auf «Auf Einkaufsliste».</div>`;return}
+  const groups=[...new Set(shop.map(s=>s.r))];
+  m.innerHTML=`<div class="shop">${groups.map(g=>{const it=shop.filter(s=>s.r===g);
+    return `<h3>${esc(it[0].rn)} <span>· ${esc(it[0].p)}</span></h3><div class="card"><ul class="ing">${it.map(s=>`<li class="${s.done?'done':''}"><button data-id="${s.id}"><span class="box">${ICON.check}</span><span class="q">${esc(s.q)}</span><span class="n">${esc(s.n)}</span></button></li>`).join('')}</ul></div>`}).join('')}</div>
+    <div class="actions"><button class="btn" id="clrDone">Erledigte entfernen</button><button class="btn" id="clrAll">Liste leeren</button></div>`;
+  m.querySelectorAll('.ing button').forEach(b=>b.onclick=()=>{const s=shop.find(x=>x.id===b.dataset.id);s.done=!s.done;store.set('shop',shop);b.parentElement.classList.toggle('done',s.done);renderBadges()});
+  $('#clrDone').onclick=()=>{shop=shop.filter(s=>!s.done);store.set('shop',shop);render()};
+  let armed=false;
+  $('#clrAll').onclick=e=>{ if(!armed){armed=true;e.target.textContent='Wirklich leeren?';setTimeout(()=>{armed=false;if(e.target.isConnected)e.target.textContent='Liste leeren'},3000);return}
+    shop=[];store.set('shop',shop);render();toast('Einkaufsliste geleert')};
+}
+
+/* ---------- Timer ---------- */
+let timers=store.get('timers',[]);
+let audio=null, ringing=null, ringLoop=null;
+function unlockAudio(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch(e){}}
+function startTimer(label,mins){
+  unlockAudio();
+  timers.push({id:Date.now().toString(36),label,dur:Math.round(mins*60),end:Date.now()+mins*60000,ack:false});
+  store.set('timers',timers); toast('Timer gestartet: '+fmtDur(mins*60)); renderBadges(); renderTbar(); syncWake();
+  if(view==='timer') renderTimers();
+}
+const fmtDur=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+function beep(){ if(!audio) return; try{ const o=audio.createOscillator(),g=audio.createGain(); o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(audio.destination);
+  const t=audio.currentTime; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.5,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.5); o.start(t); o.stop(t+0.55);}catch(e){} }
+function tick(){
+  const now=Date.now();
+  const due=timers.find(t=>!t.ack&&t.end<=now);
+  if(due&&!ringing){ ringing=due; showAlarm(due); }
+  document.querySelectorAll('[data-left]').forEach(el=>{const t=timers.find(x=>x.id===el.dataset.left);if(t){const l=(t.end-now)/1000;el.textContent=l>=0?fmtDur(l):'+'+fmtDur(-l);el.closest('.tcard')?.classList.toggle('over',l<0)}});
+  renderTbar(true);
+}
+setInterval(tick,1000);
+function showAlarm(t){
+  $('#overlay').innerHTML=`<div class="alarm" role="alertdialog" aria-labelledby="alH"><div><h3 id="alH">Zeit ist um</h3><p>${esc(t.label)}</p><button class="btn pri" id="alOk">OK, Timer beenden</button></div></div>`;
+  $('#alOk').onclick=()=>{t.ack=true;timers=timers.filter(x=>x!==t);store.set('timers',timers);stopRing();renderBadges();renderTbar();syncWake();if(view==='timer')renderTimers()};
+  unlockAudio(); beep(); if(navigator.vibrate) navigator.vibrate([400,200,400,200,400]);
+  ringLoop=setInterval(()=>{beep();if(navigator.vibrate)navigator.vibrate(400)},1200);
+}
+function stopRing(){clearInterval(ringLoop);ringLoop=null;ringing=null;$('#overlay').innerHTML='';if(navigator.vibrate)navigator.vibrate(0)}
+function renderTimers(){
+  header('Timer',false);
+  const now=Date.now();
+  $('#main').innerHTML=`${timers.length?`<div class="tlist">${timers.map(t=>`<div class="tcard"><div class="lab">${esc(t.label)}</div><div></div>
+      <div class="big" data-left="${t.id}">${fmtDur((t.end-now)/1000)}</div><div class="small">von ${fmtDur(t.dur)}</div>
+      <div class="ctl"><button class="btn" data-add="${t.id}">+1 Min</button><button class="btn" data-del="${t.id}">Stoppen</button></div></div>`).join('')}</div>`
+    :`<div class="empty"><b>Kein Timer läuft</b>Im Rezept auf eine Zeitangabe wie <span class="tbtn" style="pointer-events:none">${ICON.clock} 12 min</span> tippen, oder hier einen eigenen Timer stellen.</div>`}
+    <form class="own" id="own"><input id="ownMin" type="number" inputmode="decimal" min="0.05" step="any" placeholder="Minuten" aria-label="Minuten"><button class="btn pri" type="submit">Eigener Timer</button></form>
+    <p class="small">Der Timer läutet, solange die App offen ist. Der Bildschirm bleibt an, solange ein Timer läuft (wenn «Bildschirm bleibt an» eingeschaltet ist).</p>`;
+  $('#main').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const t=timers.find(x=>x.id===b.dataset.add);t.end=Math.max(t.end,Date.now())+60000;t.dur+=60;store.set('timers',timers);tick()});
+  $('#main').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{timers=timers.filter(x=>x.id!==b.dataset.del);store.set('timers',timers);renderTimers();renderBadges();renderTbar();syncWake()});
+  $('#own').onsubmit=e=>{e.preventDefault();const v=parseFloat(String($('#ownMin').value).replace(',','.'));if(v>0){startTimer('Eigener Timer',v)}};
+}
+function renderTbar(onlyText){
+  const act=timers.filter(t=>!t.ack).sort((a,b)=>a.end-b.end);
+  const el=$('#tbar');
+  if(!act.length||view==='timer'){el.innerHTML='';return}
+  const t=act[0],l=(t.end-Date.now())/1000;
+  const txt=`${ICON.clock.replace('<svg','<svg width="20" height="20"')}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.label)}</span><span class="tm">${l>=0?fmtDur(l):'+'+fmtDur(-l)}</span>${act.length>1?`<span class="small">+${act.length-1}</span>`:''}`;
+  if(onlyText&&el.firstChild){el.firstChild.innerHTML=txt;return}
+  el.innerHTML=`<a class="tbar" href="#/timer">${txt}</a>`;
+}
+function renderBadges(){
+  const s=shop.filter(x=>!x.done).length, t=timers.filter(x=>!x.ack).length;
+  $('#bShop').hidden=!s; $('#bShop').textContent=s; $('#bTimer').hidden=!t; $('#bTimer').textContent=t;
+}
+
+/* ---------- Info / Einstellungen ---------- */
+function renderAbout(){
+  header('Einstellungen & Hilfe',true);
+  $('#main').innerHTML=`<div class="about">
+    <h2 style="font-size:1.3rem;margin-top:18px">Schriftgrösse</h2>
+    <div class="fsrow">${[[1,'Normal'],[1.15,'Gross'],[1.3,'Sehr gross']].map(([v,n])=>`<button class="chip${fsScale===v?' on':''}" data-fs="${v}">${n}</button>`).join('')}</div>
+    <h2 style="font-size:1.3rem">So funktioniert die App</h2>
+    <p><b>Portionen:</b> Mit − und + ändern. Tippen auf die Zahl stellt die Grundmenge wieder her.</p>
+    <p><b>Nur Zutaten / Mit Zubereitung:</b> «Nur Zutaten» zeigt eine kompakte Liste zum Abwiegen.</p>
+    <p><b>Abhaken:</b> Auf eine Zutat tippen. Die Häkchen bleiben, bis du «Häkchen löschen» drückst.</p>
+    <p><b>Bildschirm bleibt an:</b> Ist eingeschaltet, solange ein Rezept offen ist oder ein Timer läuft.</p>
+    <p><b>Timer:</b> Auf eine Zeitangabe im Rezept tippen. Der Timer läutet (auf Android auch mit Vibration), solange die App offen ist.</p>
+    <p><b>Als PDF teilen:</b> Erstellt ein PDF (A5) des Rezepts mit den eingestellten Portionen und deinen Notizen und öffnet das Teilen-Menü (WhatsApp, Mail …).</p>
+    <p><b>Drucken:</b> Druckt das Rezept auf A5. Tut sich nichts, «Als PDF teilen» und im Teilen-Menü «Drucken» wählen.</p>
+    <p><b>Verbesserung vorschlagen:</b> Öffnet das Rezept im Online-Rezeptbuch. Das geht nur, wenn Raphael es für dich freigegeben hat.</p>
+    <p><b>Vorbehalt:</b> Gelb hinterlegte Hinweise und Angaben mit «Vorschlag» stehen nicht im Original.</p>
+    <p><b>Gelatine:</b> Angaben in Haushaltsblättern (ca. 1,7 g). 1 Profi-Blatt aus dem Original = 2 Haushaltsblätter.</p>
+    <p><b>Abkürzungen:</b> K Zucker = Kristallzucker · P/S Zucker = Puderzucker · VZ/OZ/ZZ = Vanille-/Orangen-/Zitronenzucker · TK = tiefgekühlt.</p>
+    <h2 style="font-size:1.3rem">Auf dem iPhone</h2>
+    <p><b>Installieren:</b> Adresse in <b>Safari</b> öffnen, dann «Teilen» (Quadrat mit Pfeil) → «Zum Home-Bildschirm».</p>
+    <p><b>Bildschirm bleibt an</b> funktioniert ab iOS 18.4. Der Timer kann auf dem iPhone nicht vibrieren; ist das iPhone auf lautlos gestellt, bleibt der Ton evtl. stumm. Die Meldung «Zeit ist um» erscheint trotzdem.</p>
+    <h2 style="font-size:1.3rem">Daten auf diesem Handy</h2>
+    <p class="small">Notizen, Häkchen, Einkaufsliste und Timer werden nur auf diesem Gerät gespeichert. ${R.length} Rezepte · Stand ${esc(META.stand||'')} · Version ${APP_VERSION}</p>
+    <button class="btn" id="lock" style="width:100%;margin:8px 0 20px">App auf diesem Gerät sperren</button>
+  </div>`;
+  let armed=false;
+  $('#lock').onclick=e=>{ if(!armed){armed=true;e.target.textContent='Wirklich sperren? Nochmals tippen';setTimeout(()=>{armed=false;if(e.target.isConnected)e.target.textContent='App auf diesem Gerät sperren'},4000);return}
+    try{localStorage.removeItem('kb:key')}catch(x){} location.reload(); };
+  $('#main').querySelectorAll('[data-fs]').forEach(b=>b.onclick=()=>{fsScale=+b.dataset.fs;store.set('fs',fsScale);document.documentElement.style.setProperty('--fs',(17*fsScale)+'px');renderAbout()});
+}
+
+/* ---------- Rezept als PDF / Drucken ---------- */
+function recipeData(r){
+  const f=factor(r), n=portions(r), ings=[];
+  r.parts.forEach(p=>p.ing.forEach(g=>{ if(g.sub) ings.push({sub:plain(g.sub)}); const nm=plain(g.n); if(!nm) return; const h=hint(g,f); ings.push({q:qty(g,f),n:nm+(h?' ('+h+')':'')}); }));
+  return {name:r.name, yield:String(n).replace('.',',')+' '+r.y.unit, cat:catName(r.cat), ings,
+    steps:r.parts.filter(p=>p.step).map(p=>plain(p.step)),
+    temp:r.temp?plain(r.temp)+(r.vb?' (Vorschlag, nicht im Original)':''):'',
+    note:r.note?plain(r.note):'', vbn:r.vbn?r.vbn.map(plain).join(' '):'', own:store.get('note:'+r.slug,''), src:r.src};
+}
+const PDFMAP={'≈':'ca. ','→':'-> ','⅓':'1/3','⅔':'2/3','⅛':'1/8','−':'-',' ':' ',' ':' ',' ':' '};
+const CP1252='€‚„…†‡‰Š‹ŒŽ‘’“”•–—™š›œžŸ';
+const pdfSafe=s=>String(s).replace(/[^\x00-\xff]/g,c=>PDFMAP[c]??(CP1252.includes(c)?c:''));
+function makePdf(r){
+  const d=recipeData(r); const doc=new window.jspdf.jsPDF({unit:'mm',format:'a5'});
+  const W=148,H=210,M=14,CW=W-2*M,QW=22; let y=M;
+  const S=pdfSafe, LH=sz=>sz*0.3528*1.35;
+  const font=(st,sz,col)=>{doc.setFont('helvetica',st);doc.setFontSize(sz);doc.setTextColor(...(col||[25,28,27]))};
+  const need=h=>{if(y+h>H-M-4){doc.addPage();y=M}};
+  const para=(txt,x,w,st,sz,col)=>{font(st,sz,col);doc.splitTextToSize(S(txt),w).forEach(l=>{need(LH(sz));doc.text(l,x,y+LH(sz)*0.78);y+=LH(sz)})};
+  const head=t=>{need(12);font('bold',9,[46,74,63]);doc.text(S(t.toUpperCase()),M,y+3.5);y+=6.5};
+  para(d.name,M,CW,'bold',17,[30,40,36]); y+=0.5;
+  para(d.yield+'  ·  '+d.cat,M,CW,'normal',9.5,[90,96,93]);
+  doc.setDrawColor(46,74,63);doc.setLineWidth(0.4);doc.line(M,y+1,W-M,y+1);y+=5;
+  head('Zutaten');
+  d.ings.forEach(g=>{
+    if(g.sub){y+=1;para(g.sub,M,CW,'bold',10);return}
+    font('normal',10); const lines=doc.splitTextToSize(S(g.n),CW-QW-3), h=lines.length*LH(10); need(h);
+    if(g.q){font('bold',10);doc.text(S(g.q),M+QW,y+LH(10)*0.78,{align:'right'})}
+    font('normal',10); lines.forEach((l,k)=>doc.text(l,M+QW+3,y+LH(10)*(0.78+k))); y+=h+0.7;
+  });
+  if(d.temp){y+=2;font('bold',9.5);const lines=doc.splitTextToSize(S(d.temp),CW-6),h=lines.length*LH(9.5)+3;need(h);
+    doc.setFillColor(231,237,233);doc.rect(M,y,CW,h,'F');font('bold',9.5,[46,74,63]);lines.forEach((l,k)=>doc.text(l,M+3,y+1.5+LH(9.5)*(0.78+k)));y+=h+1}
+  if(d.steps.length){y+=3;head('Zubereitung');d.steps.forEach((s,k)=>{font('normal',10);const lines=doc.splitTextToSize(S(s),CW-7),h=lines.length*LH(10);need(h);
+    font('bold',10,[46,74,63]);doc.text((k+1)+'.',M,y+LH(10)*0.78);font('normal',10);lines.forEach((l,j)=>doc.text(l,M+7,y+LH(10)*(0.78+j)));y+=h+1.6})}
+  if(d.note){y+=2;para(d.note,M,CW,'normal',8.5,[80,84,82])}
+  if(d.vbn){y+=1.5;para('Vorbehalt: '+d.vbn,M,CW,'italic',8.5,[125,95,25])}
+  if(d.own){y+=2;head('Meine Notizen');para(d.own,M,CW,'normal',9.5)}
+  const n=doc.getNumberOfPages();
+  for(let p=1;p<=n;p++){doc.setPage(p);font('normal',7.5,[130,134,132]);doc.text(doc.splitTextToSize(S('Raphaels Kochbuch · '+d.src),CW-14)[0],M,H-7);if(n>1)doc.text(p+'/'+n,W-M,H-7,{align:'right'})}
+  return doc.output('blob');
+}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+async function sharePdf(r){
+  if(!window.jspdf){toast('PDF-Erstellung ist gerade nicht verfügbar');return}
+  let blob; try{blob=makePdf(r)}catch(e){toast('PDF konnte nicht erstellt werden');return}
+  const name=r.slug+'.pdf', file=new File([blob],name,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:r.name,text:r.name+' – aus Raphaels Kochbuch'})}
+    catch(e){ if(e&&e.name!=='AbortError'){download(blob,name);toast('PDF gespeichert')} }
+  } else { download(blob,name); toast('PDF gespeichert (Downloads)') }
+}
+function printRecipe(r){
+  const d=recipeData(r), e=esc;
+  $('#printArea').innerHTML=`<h1>${e(d.name)}</h1><div class="meta">${e(d.yield)} · ${e(d.cat)}</div>
+    <h2>Zutaten</h2><table>${d.ings.map(g=>g.sub?`<tr class="sub"><td colspan="2">${e(g.sub)}</td></tr>`:`<tr><td class="q">${e(g.q)}</td><td>${e(g.n)}</td></tr>`).join('')}</table>
+    ${d.temp?`<div class="box">${e(d.temp)}</div>`:''}
+    ${d.steps.length?`<h2>Zubereitung</h2><ol>${d.steps.map(s=>`<li>${e(s)}</li>`).join('')}</ol>`:''}
+    ${d.note?`<p class="small">${e(d.note)}</p>`:''}${d.vbn?`<p class="small"><i>Vorbehalt: ${e(d.vbn)}</i></p>`:''}
+    ${d.own?`<h2>Meine Notizen</h2><p>${e(d.own)}</p>`:''}<p class="small">Raphaels Kochbuch · ${e(d.src)}</p>`;
+  setTimeout(()=>{try{window.print()}catch(x){toast('Drucken geht hier nicht – bitte «Als PDF teilen» nutzen')}},60);
+}
+
+/* ---------- Meldungen ---------- */
+let toastT;
+function toast(msg,action){
+  clearTimeout(toastT); let el=$('.toast'); if(el) el.remove();
+  el=document.createElement(action?'button':'div'); el.className='toast'; el.textContent=msg; if(action) el.onclick=action;
+  document.body.appendChild(el); toastT=setTimeout(()=>el.remove(),action?15000:2600);
+}
+
+/* ---------- Offline / Updates ---------- */
+const APP_VERSION='2026-11-13';
+
+route();
+tick();
+}
+</script>
+<script>
+"use strict";
+/* ---------- Passwort, Entschlüsselung, Offline-Speicher ---------- */
+(function(){
+  const KEYSTORE='kb:key';
+  const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const ub64=buf=>{const u=new Uint8Array(buf);let s='';u.forEach(b=>s+=String.fromCharCode(b));return btoa(s)};
+  let enc=null;
+  async function loadEnc(){ if(enc) return enc; let r; try{r=await fetch('rezepte.enc.json')}catch(e){throw Object.assign(new Error('net'),{net:true})} if(!r.ok) throw Object.assign(new Error('net'),{net:true}); enc=await r.json(); return enc; }
+  async function decryptWith(key){ const e=await loadEnc(); const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.ct)); return JSON.parse(new TextDecoder().decode(pt)); }
+  async function keyFromPw(pw){ const e=await loadEnc(); const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['decrypt']); }
+  function open(data){ window.R=data.R; window.CATS=data.CATS; window.META=data.meta||{}; const g=document.getElementById('gate'); if(g) g.remove(); startApp(); }
+  function showGate(msg){
+    const g=document.createElement('div'); g.className='gate'; g.id='gate';
+    g.innerHTML='<form id="gf"><img src="icon-192.png" alt=""><h1>Raphaels Kochbuch</h1><p>Bitte Passwort eingeben. Danach öffnet sich die App auf diesem Gerät ohne Passwort.</p><input type="password" id="gpw" aria-label="Passwort" placeholder="Passwort" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="submit" id="gbtn">Öffnen</button><div class="err" id="gerr" role="alert"></div></form>';
+    document.body.appendChild(g);
+    const err=document.getElementById('gerr'), btn=document.getElementById('gbtn'), pw=document.getElementById('gpw');
+    err.textContent=msg||''; pw.focus();
+    document.getElementById('gf').onsubmit=async ev=>{
+      ev.preventDefault(); if(!pw.value) {err.textContent='Bitte Passwort eingeben.';return}
+      btn.disabled=true; err.textContent='Wird geprüft …';
+      try{ const key=await keyFromPw(pw.value); const data=await decryptWith(key);
+        try{localStorage.setItem(KEYSTORE,ub64(await crypto.subtle.exportKey('raw',key)))}catch(x){}
+        open(data);
+      }catch(e){ err.textContent=e&&e.net?'Keine Verbindung. Beim ersten Öffnen braucht die App Internet.':'Falsches Passwort.'; btn.disabled=false; pw.select(); }
+    };
+  }
+  async function boot(){
+    if(!window.crypto||!crypto.subtle){ showGate('Diese App braucht eine sichere Verbindung (https).'); return }
+    let raw=null; try{raw=localStorage.getItem(KEYSTORE)}catch(e){}
+    if(raw){ try{ const key=await crypto.subtle.importKey('raw',b64(raw),'AES-GCM',false,['decrypt']); open(await decryptWith(key)); return }catch(e){} }
+    showGate('');
+  }
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{const nw=reg.installing;nw&&nw.addEventListener('statechange',()=>{
+        if(nw.state==='installed'&&navigator.serviceWorker.controller){const b=document.createElement('button');b.className='toast';b.textContent='Neue Version verfügbar – hier tippen zum Laden';b.onclick=()=>nw.postMessage('skip');document.body.appendChild(b)}});});
+    }).catch(()=>{});
+    let reloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload()});
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
