@@ -173,7 +173,7 @@ main{padding:0 max(14px,env(safe-area-inset-right,0px)) calc(96px + env(safe-are
   #printArea tr.sub td{font-weight:bold;padding-top:2mm}
   #printArea ol{padding-left:5mm;margin:0}
   #printArea li{margin:1.2mm 0}
-  #printArea .box{background:#eee;padding:2mm 3mm;margin:3mm 0;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printArea .ptemp{background:#eee;padding:2mm 3mm;margin:3mm 0;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #printArea .small{font-size:8.5pt;color:#444}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -526,7 +526,7 @@ function recipeData(r){
   const f=factor(r), n=portions(r), ings=[];
   r.parts.forEach(p=>p.ing.forEach(g=>{ if(g.sub) ings.push({sub:plain(g.sub)}); const nm=plain(g.n); if(!nm) return; const h=hint(g,f); ings.push({q:qty(g,f),n:nm+(h?' ('+h+')':'')}); }));
   return {name:r.name, yield:String(n).replace('.',',')+' '+r.y.unit, cat:catName(r.cat), ings,
-    steps:r.parts.filter(p=>p.step).map(p=>plain(p.step)),
+    steps:r.parts.filter(p=>p.step).map(p=>{const nm=p.ing.map(g=>plain(g.n).split(/[,(]/)[0].trim()).filter(Boolean);return {pre:nm.length>4?nm.slice(0,3).join(', ')+' usw.':nm.join(', '),txt:plain(p.step)}}),
     temp:r.temp?plain(r.temp)+(r.vb?' (Vorschlag, nicht im Original)':''):'',
     note:r.note?plain(r.note):'', vbn:r.vbn?r.vbn.map(plain).join(' '):'', own:store.get('note:'+r.slug,''), src:r.src};
 }
@@ -553,7 +553,7 @@ function makePdf(r){
   });
   if(d.temp){y+=2;font('bold',9.5);const lines=doc.splitTextToSize(S(d.temp),CW-6),h=lines.length*LH(9.5)+3;need(h);
     doc.setFillColor(231,237,233);doc.rect(M,y,CW,h,'F');font('bold',9.5,[46,74,63]);lines.forEach((l,k)=>doc.text(l,M+3,y+1.5+LH(9.5)*(0.78+k)));y+=h+1}
-  if(d.steps.length){y+=3;head('Zubereitung');d.steps.forEach((s,k)=>{font('normal',10);const lines=doc.splitTextToSize(S(s),CW-7),h=lines.length*LH(10);need(h);
+  if(d.steps.length){y+=3;head('Zubereitung');d.steps.forEach((s,k)=>{font('normal',10);const lines=doc.splitTextToSize(S((s.pre?s.pre+' – ':'')+s.txt),CW-7),h=lines.length*LH(10);need(h);
     font('bold',10,[46,74,63]);doc.text((k+1)+'.',M,y+LH(10)*0.78);font('normal',10);lines.forEach((l,j)=>doc.text(l,M+7,y+LH(10)*(0.78+j)));y+=h+1.6})}
   if(d.note){y+=2;para(d.note,M,CW,'normal',8.5,[80,84,82])}
   if(d.vbn){y+=1.5;para('Vorbehalt: '+d.vbn,M,CW,'italic',8.5,[125,95,25])}
@@ -576,8 +576,8 @@ function printRecipe(r){
   const d=recipeData(r), e=esc;
   $('#printArea').innerHTML=`<h1>${e(d.name)}</h1><div class="meta">${e(d.yield)} · ${e(d.cat)}</div>
     <h2>Zutaten</h2><table>${d.ings.map(g=>g.sub?`<tr class="sub"><td colspan="2">${e(g.sub)}</td></tr>`:`<tr><td class="q">${e(g.q)}</td><td>${e(g.n)}</td></tr>`).join('')}</table>
-    ${d.temp?`<div class="box">${e(d.temp)}</div>`:''}
-    ${d.steps.length?`<h2>Zubereitung</h2><ol>${d.steps.map(s=>`<li>${e(s)}</li>`).join('')}</ol>`:''}
+    ${d.temp?`<div class="ptemp">${e(d.temp)}</div>`:''}
+    ${d.steps.length?`<h2>Zubereitung</h2><ol>${d.steps.map(s=>`<li>${s.pre?`<b>${e(s.pre)}</b> – `:''}${e(s.txt)}</li>`).join('')}</ol>`:''}
     ${d.note?`<p class="small">${e(d.note)}</p>`:''}${d.vbn?`<p class="small"><i>Vorbehalt: ${e(d.vbn)}</i></p>`:''}
     ${d.own?`<h2>Meine Notizen</h2><p>${e(d.own)}</p>`:''}<p class="small">Raphaels Kochbuch · ${e(d.src)}</p>`;
   setTimeout(()=>{try{window.print()}catch(x){toast('Drucken geht hier nicht – bitte «Als PDF teilen» nutzen')}},60);
@@ -592,7 +592,7 @@ function toast(msg,action){
 }
 
 /* ---------- Offline / Updates ---------- */
-const APP_VERSION='2026-11-13';
+const APP_VERSION='2026-11-15';
 
 route();
 tick();
