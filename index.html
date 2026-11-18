@@ -228,9 +228,9 @@ let wakeWanted=store.get('wake',true);
 let fsScale=store.get('fs',1);
 document.documentElement.style.setProperty('--fs',(17*fsScale)+'px');
 
-const portions=r=>{const v=store.get('port:'+r.slug,null);return v>0?v:r.y.base};
+const portions=r=>{const v=store.get('port:'+r.slug,null);return v>0&&!(isExact(r)&&v>100)?v:r.y.base};
 const factor=r=>portions(r)/r.y.orig;
-const qty=(g,f)=>g.q==null?'':fmt(g.q,g.u,f);
+const qty=(g,f,r)=>g.q==null?'':(isExact(r)?fmtExact:fmt)(g.q,g.u,f);
 const hint=(g,f)=>{if(g.q==null) return '';if(g.eggs) return eggHint(g.q,f,g.eggs);if(g.u==='Blatt') return gelHint(g.q,f);return ''};
 
 /* Zeitangaben für Timer erkennen */
@@ -305,7 +305,7 @@ function listResults(){
 function renderRecipe(r){
   header(r.name,true);
   const f=factor(r), checks=store.get('chk:'+r.slug,{}), n=portions(r);
-  const ingRow=(g,id)=>`<li class="${checks[id]?'done':''}"><button data-id="${id}"><span class="box">${ICON.check}</span><span class="q">${esc(qty(g,f))}</span><span class="n">${clean(g.n)}${hint(g,f)?`<span class="h">${esc(hint(g,f))}</span>`:''}</span></button></li>`;
+  const ingRow=(g,id)=>`<li class="${checks[id]?'done':''}"><button data-id="${id}"><span class="box">${ICON.check}</span><span class="q">${esc(qty(g,f,r))}</span><span class="n">${clean(g.n)}${hint(g,f)?`<span class="h">${esc(hint(g,f))}</span>`:''}</span></button></li>`;
   let body='';
   if(mode==='zutaten'){
     body+='<div class="card">'; let open=false;
@@ -417,7 +417,7 @@ function addToShop(r){
   const f=factor(r); const n=portions(r);
   shop=shop.filter(s=>s.r!==r.slug);
   r.parts.forEach(p=>p.ing.forEach(g=>{const name=plain(g.n); if(!name) return;
-    shop.push({id:Math.random().toString(36).slice(2,9),r:r.slug,rn:r.name,p:n+' '+r.y.unit,q:qty(g,f),n:name,done:false})}));
+    shop.push({id:Math.random().toString(36).slice(2,9),r:r.slug,rn:r.name,p:n+' '+r.y.unit,q:qty(g,f,r),n:name,done:false})}));
   store.set('shop',shop); renderBadges(); toast('Zutaten für '+n+' '+r.y.unit+' auf der Einkaufsliste');
 }
 function renderShop(){
@@ -524,7 +524,7 @@ function renderAbout(){
 /* ---------- Rezept als PDF / Drucken ---------- */
 function recipeData(r){
   const f=factor(r), n=portions(r), ings=[];
-  r.parts.forEach(p=>p.ing.forEach(g=>{ if(g.sub) ings.push({sub:plain(g.sub)}); const nm=plain(g.n); if(!nm) return; const h=hint(g,f); ings.push({q:qty(g,f),n:nm+(h?' ('+h+')':'')}); }));
+  r.parts.forEach(p=>p.ing.forEach(g=>{ if(g.sub) ings.push({sub:plain(g.sub)}); const nm=plain(g.n); if(!nm) return; const h=hint(g,f); ings.push({q:qty(g,f,r),n:nm+(h?' ('+h+')':'')}); }));
   return {name:r.name, yield:String(n).replace('.',',')+' '+r.y.unit, cat:catName(r.cat), ings,
     steps:r.parts.filter(p=>p.step).map(p=>{const nm=p.ing.map(g=>plain(g.n).split(/[,(]/)[0].trim()).filter(Boolean);return {pre:nm.length>4?nm.slice(0,3).join(', ')+' usw.':nm.join(', '),txt:plain(p.step)}}),
     temp:r.temp?plain(r.temp)+(r.vb?' (Vorschlag, nicht im Original)':''):'',
@@ -592,7 +592,7 @@ function toast(msg,action){
 }
 
 /* ---------- Offline / Updates ---------- */
-const APP_VERSION='2026-11-18';
+const APP_VERSION='2026-11-18b';
 
 route();
 tick();

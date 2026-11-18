@@ -28,4 +28,13 @@ function fmt(q,u,f){
 const GEL=2, GEL_G=1.67; // 1 Profi-Blatt (3,3 g) = 2 Haushaltsblätter (1,6–1,7 g)
 function gelHint(q,f){const p=q*f;const hs=Math.round(p*GEL*2)/2;const g=Math.round(hs*GEL_G*2)/2;return `≈ ${g} g · Original: ${frac(Math.round(p*4)/4)} Profi-Blatt`}
 function eggHint(q,f,k){const [w,n]=EGG[k];const c=q*f/w;const r=Math.round(c*2)/2;return `≈ ${frac(r)} ${n}`}
-
+/* Versuch: Mengen ungerundet in g bzw. ml (auf 0,1 genau), Basis 1 kg */
+function fmtExact(q,u,f){
+  if(q==null) return '';
+  let v=q*f;
+  if(u==='kg'){v*=1000;u='g'}
+  if(u==='l'){v*=1000;u='ml'} if(u==='dl'){v*=100;u='ml'} if(u==='cl'){v*=10;u='ml'}
+  if(u==='g'||u==='ml'){const r=Math.round(v*10)/10;return r.toLocaleString('de-CH',{maximumFractionDigits:1}).replace('.',',')+' '+u}
+  return fmt(q,u,f);
+}
+const isExact=r=>r&&r.cat==='versuch';
